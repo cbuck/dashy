@@ -2722,7 +2722,10 @@ Display info from the Gluetun VPN container public IP API. This can show the IP 
 **Field** | **Type** | **Required** | **Description**
 --- | --- | --- | ---
 **`visibleFields`** | `string` |  Required | A comma separated list of the fields you want visible in the widget. You can have any number of the following : `public_ip`, `region`, `country`, `city`, `location`, `organisation`, `postal_code`, `timezone`. Defaults to just `public_ip`
-**`host`** | `string` |  Required | The url to the gluetun HTTP control server. E.g. `http://gluetun:8000`
+**`hostname`** | `string` |  Required | The URL to the Gluetun HTTP control server. E.g. `http://gluetun:8000`
+**`apiKey`** | `string` | Optional | API key configured for these routes in Gluetun. Sent in the `X-API-Key` header. Takes precedence over basic auth when both are configured.
+**`username`** | `string` | Optional | Username for Gluetun HTTP basic authentication. Must be used with `password`.
+**`password`** | `string` | Optional | Password for Gluetun HTTP basic authentication. Must be used with `username`.
 
 #### Example
 
@@ -2731,8 +2734,16 @@ Display info from the Gluetun VPN container public IP API. This can show the IP 
   useProxy: true
   options:
     hostname: http://server-or-conatiner-hostname:8000
+    apiKey: your-gluetun-api-key
     visibleFields: public_ip,region,country,city,location,organisation,postal_code,timezone
 ```
+
+Gluetun protects all control-server routes by default. Configure `apiKey`, or
+configure both `username` and `password`, to match the role covering
+`GET /v1/publicip/ip` and (when displayed) `GET /v1/portforward` in Gluetun's
+`/gluetun/auth/config.toml`. These values support Dashy environment-variable
+placeholders. If the Gluetun role explicitly uses `auth = "none"`, omit all
+three authentication options.
 
 #### Info
 

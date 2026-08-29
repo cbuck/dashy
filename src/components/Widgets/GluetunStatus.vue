@@ -65,13 +65,25 @@ export default {
       if (!this.options.hostname) this.error('`hostname` is required');
       return this.parseAsEnvVar(this.options.hostname);
     },
+    requestHeaders() {
+      if (this.options.apiKey) {
+        return { 'X-API-Key': this.parseAsEnvVar(this.options.apiKey) };
+      }
+      if (this.options.username && this.options.password) {
+        const username = this.parseAsEnvVar(this.options.username);
+        const password = this.parseAsEnvVar(this.options.password);
+        return { Authorization: `Basic ${window.btoa(`${username}:${password}`)}` };
+      }
+      return {};
+    },
   },
   methods: {
     /* Make GET request to Gluetun publicip API endpoint */
     fetchData() {
-      this.makeRequest(`${this.hostname}/v1/publicip/ip`).then(this.processData);
+      this.makeRequest(`${this.hostname}/v1/publicip/ip`, this.requestHeaders)
+        .then(this.processData);
 
-      this.makeRequest(`${this.hostname}/v1/portforward`)
+      this.makeRequest(`${this.hostname}/v1/portforward`, this.requestHeaders)
         .then(this.processPortData)
         .catch(() => {
           this.forwarded_port = null;
