@@ -9,6 +9,7 @@ Dashy has support for displaying dynamic content in the form of widgets. There a
   - [Weather](#weather)
   - [Weather Forecast](#weather-forecast)
   - [RSS Feed](#rss-feed)
+  - [Calendar](#calendar)
   - [Image](#image)
   - [Public IP Address](#public-ip)
   - [IP Blacklist Checker](#ip-blacklist)
@@ -103,6 +104,7 @@ Dashy has support for displaying dynamic content in the form of widgets. There a
   - [Widget Usage Guide](#widget-usage-guide)
   - [Continuous Updates](#continuous-updates)
   - [Proxying Requests](#proxying-requests)
+  - [Ignoring Certificate Errors](#ignoring-certificate-errors)
   - [Handling Secrets](#handling-secrets)
   - [Setting Timeout](#setting-timeout)
   - [Adding Labels](#adding-labels)
@@ -259,6 +261,83 @@ Display news and updates from any RSS-enabled service.
 - **Auth**: 🟠 Optional
 - **Price**: 🟠 Free Plan (up to 10,000 requests / day)
 - **Privacy**: _See [Rss2Json Privacy Policy](https://rss2json.com/privacy-policy)_
+
+---
+
+### Calendar
+
+Shows upcoming events from any calendar that publishes an iCalendar (`.ics`) feed. Works with Nextcloud, Google, Proton, iCloud, Outlook, Radicale,  Baïkal, etc.
+
+Note that this needs to be proxied through Dashy, since calendar providers don't send CORS headers.
+`webcal://` links are accepted, same as `https://`.
+Recurring events, exceptions and moved occurrences are all expanded, and times are converted to your browser's timezone.
+Events already underway stay listed until they end, and calendars with no `name` set use the name their feed publishes.
+
+#### Options
+
+**Field** | **Type** | **Required** | **Description**
+--- | --- | --- | ---
+**`calendarUrl`** | `string` or `array` |  Required | The URL of your ICS feed. Pass an array to combine several, each either a URL or an object with `url`, plus optional `name` and `color`
+**`days`** | `number` |  _Optional_ | How many days ahead to show. Min: `1`, max: `365`. Defaults to `7`
+**`limit`** | `number` |  _Optional_ | Maximum number of events to show. Defaults to `10`
+**`hideAllDay`** | `boolean` |  _Optional_ | If `true`, all-day events are omitted
+**`showLocation`** | `boolean` |  _Optional_ | If `true`, shows each event's location under its title
+**`showDescription`** | `boolean` |  _Optional_ | If `true`, shows each event's description under its title
+**`startDate`** | `string` |  _Optional_ | Show events from this date instead of today, e.g. `2026-09-03`
+
+#### Example
+
+```yaml
+- type: calendar
+  options:
+    calendarUrl: https://nextcloud.example.com/remote.php/dav/public-calendars/AbCdEf123?export
+    days: 14
+```
+
+Combining calendars, and colour-coding them:
+
+```yaml
+- type: calendar
+  options:
+    limit: 15
+    calendarUrl:
+      - url: https://calendar.google.com/calendar/ical/xxxx/private-xxxx/basic.ics
+        name: Personal
+        color: '#5cabca'
+      - url: webcal://p12-calendars.icloud.com/published/2/xxxx
+        name: Family
+        color: '#e8j54a'
+```
+
+#### Getting your feed URL
+
+**Provider** | **Where to find it**
+--- | ---
+Nextcloud | Calendar → **⋯** → _Copy subscription link_, then append `?export`. Or, for a private calendar, use `https://user:app-password@host/remote.php/dav/calendars/user/calendar-name?export`
+Google | Settings → _Settings for my calendars_ → **Integrate calendar** → _Secret address in iCal format_
+Proton | Settings → Calendars → _Share with anyone_. Requires a paid plan, and the link must be set to **Full view**
+iCloud | Right-click the calendar → _Share Calendar_ → **Public Calendar**
+Outlook | Settings → Calendar → _Shared calendars_ → **Publish a calendar**, choosing the ICS link
+
+#### Keeping your URL private
+
+A calendar URL is a password in disguise: anyone who has it can read your calendar. Since widget options are sent to the browser, don't put a secret feed URL directly in your config if other people can view your dashboard. Instead, set it as an environment variable prefixed with `DASHY_`, and reference the name:
+
+```yaml
+- type: calendar
+  options:
+    calendarUrl: DASHY_MY_CALENDAR
+```
+
+The proxy substitutes the real value server-side, so the URL never reaches the browser.
+
+#### Info
+
+- **CORS**: 🔴 Proxied
+- **Auth**: 🟠 Optional (a secret or authenticated feed URL, where the calendar isn't public)
+- **Price**: 🟢 Free
+- **Host**: Self-Hosted or Managed
+- **Privacy**: _No third-party service is used; Dashy fetches your feed directly_
 
 ---
 
@@ -987,7 +1066,7 @@ Shows real-time tube status of the London Underground. All fields are optional.
 
 ### Stock Price History
 
-Shows recent price history for a given publicly-traded stock or share
+Shows recent daily price history for a given publicly-traded stock or share
 
 <p align="center"><img width="400" src="https://pixelflare.cc/alicia/dashy/stocks" /></p>
 
@@ -998,6 +1077,7 @@ Shows recent price history for a given publicly-traded stock or share
 **`apiKey`** | `string` |  Required | API key for [Alpha Vantage](https://www.alphavantage.co/), you can get a free API key [here](https://www.alphavantage.co/support/#api-key)
 **`stock`** | `string` | Required | The stock symbol for the asset to fetch data for
 **`priceTime`** | `string` |  _Optional_ | The time to fetch price for. Can be `high`, `low`, `open` or `close`. Defaults to `high`
+**`dataPoints`** | `number` | _Optional_ | Number of days to plot, between `6` and `99`. Defaults to `30`
 **`chartColor`** | `string` | _Optional_ | Color of the chart value. Defaults to `--widget-text-color` which inherits dashboard primary color
 **`chartHeight`** | `number` | _Optional_ | The height of rendered chart in px. Defaults to `300`
 
@@ -1014,7 +1094,7 @@ Shows recent price history for a given publicly-traded stock or share
 
 - **CORS**: 🟢 Enabled
 - **Auth**: 🔴 Required
-- **Price**: 🟠 Free plan (up to 500 requests/day)
+- **Price**: 🟠 Free plan (up to 25 requests/day)
 - **Host**: Managed Instance Only
 - **Privacy**: _See [AlphaVantage Privacy Policy](https://www.alphavantage.co/privacy/)_
 
@@ -1177,18 +1257,28 @@ Displays airport departure and arrival flights, using data from [AeroDataBox](ht
 
 ### Astronomy Picture of the Day
 
-Show the NASA Astronomy Picture of the Day. Data is fetched from [APOD](https://apod.nasa.gov/apod/) using [@Lissy93/go-apod](https://github.com/lissy93/go-apod) / hosted at [apod.as93.net](https://apod.as93.net/).
+Show the NASA Astronomy Picture of the Day. Data is fetched from [APOD](https://science.nasa.gov/apod/) using [@Lissy93/go-apod](https://github.com/lissy93/go-apod) / hosted at [apod.as93.net](https://apod.as93.net/).
 
 <p align="center"><img width="400" src="https://storage.googleapis.com/as93-screenshots/dashy/apod.png" /></p>
 
 #### Options
 
-_No config options._
+**Field** | **Type** | **Required** | **Description**
+--- | --- | --- | ---
+**`hostname`** | `string` |  _Optional_ | The URL of your own [go-apod](https://github.com/lissy93/go-apod) instance. Defaults to `https://apod.as93.net`
 
 #### Example
 
 ```yaml
 - type: apod
+```
+
+Or, using a self-hosted instance:
+
+```yaml
+- type: apod
+  options:
+    hostname: https://apod.example.com
 ```
 
 #### Info
@@ -2805,6 +2895,7 @@ This widget displays the status of your Uptime Kuma monitors from a given status
 | **`hideHistory`**  | `boolean` | _Optional_   | Optionally hide the strip of recent heartbeats |
 | **`hideUptime`**   | `boolean` | _Optional_   | Optionally hide the 24-hour uptime percentage |
 | **`hideStatus`**   | `boolean` | _Optional_   | Optionally hide the up/ down status pill |
+| **`statusLabels`** | `object` | _Optional_   | Optional text overrides for the status pill, keyed by status: `up`, `down`, `pending`, `maintenance`, `unknown` |
 
 #### Example
 
@@ -2839,6 +2930,7 @@ This widget displays the status of your Uptime Kuma monitors from a given status
 | **`hideStatus`** | `boolean` | _Optional_ | Optionally hide the up/ down status pill |
 | **`hideResponseTime`** | `boolean` | _Optional_ | Optionally hide the response time |
 | **`hideUptime`** | `boolean` | _Optional_ | Optionally hide the 24-hour uptime percentage |
+| **`statusLabels`** | `object` | _Optional_ | Optional text overrides for the status pill, keyed by status: `up`, `down`, `pending`, `maintenance`, `unknown` |
 
 Each monitor shows its status, response time and 24-hour uptime. Hover a monitor for its 30-day and 1-year uptime, and average response times. Hide any of the columns with the options above.
 
@@ -3342,6 +3434,7 @@ Many websites and apps provide their own embeddable widgets. These can be used w
 **Field** | **Type** | **Required** | **Description**
 --- | --- | --- | ---
 **`html`** | `string` |  _Optional_ | HTML contents to render in the widget
+**`htmlSrc`** | `string` |  _Optional_ | A URL (local or remote) to fetch HTML contents from, instead of defining `html`
 **`script`** | `string` |  _Optional_ | Raw JavaScript code to execute (caution)
 **`scriptSrc`** | `string` |  _Optional_ | A URL to JavaScript content (caution)
 **`css`** | `string` |  _Optional_ | Any stylings for widget contents
@@ -3370,6 +3463,15 @@ Or
       css: '.coinmarketcap-currency-widget { color: var(--widget-text-color); }'
       html: '<div class="coinmarketcap-currency-widget" data-currencyid="1" data-base="USD" data-secondary="" data-ticker="true" data-rank="true" data-marketcap="true" data-volume="true" data-statsticker="true" data-stats="USD"></div>'
       scriptSrc: 'https://files.coinmarketcap.com/static/widget/currency.js'
+```
+
+Or fetch the markup from a file, so it's styled like the rest of your dashboard:
+
+```yaml
+- type: embed
+  options:
+    htmlSrc: /component.html
+    css: 'p { color: var(--widget-text-color); }'
 ```
 
 You can also use this widget to display an image, wither locally or from a remote origin.
@@ -3565,6 +3667,28 @@ Alternatively, and more securely, you can set the auth headers on your service t
 Access-Control-Allow-Origin: https://location-of-dashy/
 Vary: Origin
 ```
+
+---
+
+### Ignoring Certificate Errors
+
+If you're calling a local service with a self-signed certificate, then you'll get an error (like `UNABLE_TO_VERIFY_LEAF_SIGNATURE` or `ERR_TLS_CERT_ALTNAME_INVALID`).
+
+If you trust the host, you can choose to skip certificate verification for that widget, by setting `allowInsecure: true`, this will fix your issue.
+
+Note that this only works if `useProxy: true` is also set, since browsers don't allow you to skip cert checks.
+
+```yaml
+widgets:
+- type: customapi
+  useProxy: true
+  allowInsecure: true
+  options:
+    url: https://tool.ad.local/api/status
+```
+
+> [!WARNING]
+> With verification off, nothing checks that you're talking to the server you think you are. Any headers you've set on the widget (API keys, basic auth) are sent over that unverified connection. Prefer fixing the certificate, or adding your CA with `NODE_EXTRA_CA_CERTS`, where you can.
 
 ---
 

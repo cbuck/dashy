@@ -85,6 +85,7 @@
   - [Fixing Widget CORS Errors](#widget-cors-errors)
   - [CORS Proxy connect ECONNREFUSED or ENOTFOUND](#cors-proxy-connect-econnrefused--or-getaddrinfo-enotfound)
   - [CORS Proxy Target-URL host blocked or scheme rejected](#cors-proxy-target-url-host--is-blocked--must-use-http-or-https)
+  - [CORS Proxy TLS certificate errors](#cors-proxy-unable_to_verify_leaf_signature-or-err_tls_cert_altname_invalid)
   - [Widget Shows Error Incorrectly](#widget-shows-error-incorrectly)
   - [Weather Forecast Widget 401](#weather-forecast-widget-401)
   - [Widget Displaying Inaccurate Data](#widget-displaying-inaccurate-data)
@@ -195,7 +196,7 @@ Dashy runs as UID=1000 (default non-root node user). You can see this by running
 
 Fixes:
 1. **Hand the directory to uid 1000** (recommended). Keeps the container running as a non-root user, which is how Dashy is built to run `sudo chown -R 1000:1000 /path/to/your/user-data`
-2. **Run the container as your own user** if `chown` isn't practical (multi-user hosts, NAS appliances, host directories you don't want relabelled). Add `--user $(id -u):$(id -g)` to `docker run`, or set `user: "1000:1000"` (or your host uid:gid) on the service in `docker-compose.yml`.
+2. **Run the container as your own user** if `chown` isn't practical (multi-user hosts, NAS appliances, host directories you don't want relabelled). Add `--user $(id -u):$(id -g)` to `docker run`, or set `user: "<your-uid>:<your-gid>"` on the service in `docker-compose.yml`.
 3. **Loosen a single-file mount** if its mode is `444`. Narrow case, only fixes that one symptom: `chmod 644 /path/to/conf.yml`
 
 **Common mistakes**
@@ -916,6 +917,10 @@ DANGEROUSLY_DISABLE_PROXY_RESTRICTIONS=true
 The variable is named so loudly because flipping it on a Dashy instance that's exposed to anything other than fully trusted users re-opens the SSRF surface - anyone who can hit `/cors-proxy` can then use Dashy as a relay to reach internal services. **Don't set it on cloud-hosted or internet-exposed deployments.**
 
 Note that this is an all-or-nothing escape hatch, not a per-host allowlist. If you only need to reach one specific host that's currently blocked, please open a feature request describing the use case.
+
+### CORS Proxy `UNABLE_TO_VERIFY_LEAF_SIGNATURE` or `ERR_TLS_CERT_ALTNAME_INVALID`
+
+The target's certificate can't be verified - it's self-signed, issued by a private CA, or issued for a different hostname than the one you're requesting. If you trust the host, add `allowInsecure: true` to the widget (`useProxy: true` is needed too). To keep verification on instead, mount your CA into the container and point `NODE_EXTRA_CA_CERTS` at it. See [Ignoring Certificate Errors](/docs/widgets#ignoring-certificate-errors).
 
 ### Widget Shows Error Incorrectly
 
